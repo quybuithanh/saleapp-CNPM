@@ -1,9 +1,10 @@
 import math
 from itertools import product
 
-from flask import render_template, request
+from flask import render_template, request, redirect
 
-from eapp import app, dao
+from eapp import app, dao, login
+from  flask_login import login_user, logout_user
 
 
 @app.route('/')
@@ -17,9 +18,46 @@ def index():
 def login_view():
     return render_template('login.html')
 
+@app.route('/logout')
+def logout_view():
+    logout_user()
+    return redirect('/login')
+
+@app.route('/login', methods=['post'])
+def login_process():
+    username = request.form.get('username')
+    password = request.form.get('password')
+
+    u = dao.authorize(username=username, password=password)
+    if u:
+        login_user(user=u)
+
+    return redirect('/') if request.args.get('from') else redirect('/admin')
+
+@login.user_loader
+def load_user(user_id):
+    return dao.get_user_by_id(user_id)
+
+
 @app.route('/register')
 def register_view():
     return render_template('register.html')
+
+@app.route('/register', methods=['post'])
+def register_process():
+    password = request.form.get('password')
+    confirm = request.form.get('confirm')
+    msg = ''
+    if not password or not confirm or password != confirm:
+        msg = "Mật khẩu không khớp!"
+    else:
+        data = request.form.copy()
+        del data['confirm']
+        data['avatar'] = 'https://res.cloudinary.com/dxxwcby8l/image/upload/v1647056401/ipmsmnxjydrhpo21xrd8.jpg'
+        dao.add_user(**data)
+        return redirect('/login')
+
+    return render_template('register.html', msg=msg)
 
 @app.context_processor
 def common_responses():
